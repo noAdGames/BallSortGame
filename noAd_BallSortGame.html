@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BallSortGame</title>
+    <style>
+        body { background-color: black; color: white; font-family: Arial, sans-serif; text-align: center; }
+        .test-tube-container { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 20px; gap: 10px; }
+        .test-tube { width: 70px; height: 182px; position: relative; background-size: cover; background-image: url('test_tube50130.png'); border: 2px solid transparent; cursor: pointer; }
+        .ball { width: 36px; height: 36px; position: absolute; left: 50%; transform: translateX(-50%); transition: bottom 0.3s ease; }
+        .ball img { width: 100%; height: 100%; border-radius: 50%; }
+        .button-container { margin-top: 10px; display: flex; justify-content: center; gap: 10px; }
+        .button-container button { background-color: #444; color: white; padding: 10px 20px; border: none; cursor: pointer; transition: all 0.2s ease; }
+        .button-container button:hover { background-color: #666; }
+        .button-container button:active { transform: scale(0.9); background-color: #888; }
+    </style>
+</head>
+<body>
+    <h1>Ball Sort Game</h1>
+    <div class="test-tube-container" id="testTubes"></div>
+
+    <div class="button-container">
+        <button onclick="undoMove()">1つ前に戻る</button>
+        <button onclick="retryGame()">最初に戻る</button>
+        <button onclick="addEmptyTestTube()" id="text"></button>
+    </div>
+    
+    <div class="button-container">
+        <button onclick="restartGame()">並べ替える</button>
+    </div>
+
+    <div class="dropdown-container">
+        <label>ボール:</label>
+        <select id="numberSelect" onchange="updateGame()">
+            <option value="2">2</option><option value="3">3</option>
+            <option value="4" selected>4</option><option value="5">5</option><option value="6">6</option>
+        </select>
+        <label>種類</label>
+    </div>
+
+    <script>
+        const ballColors = ['red', 'blue', 'green', 'yellow', 'purple', 'gray'];
+        const ballImages = { red: 'red.png', blue: 'blue.png', green: 'green.png', yellow: 'yellow.png', purple: 'purple.png', gray: 'gray.png' };
+        let numBalls = 4, testTubes = [], number26 = 4, selectedTube = null, moveHistory = [], numAddTestTube = [];
+
+        function updateGame() {
+            number26 = parseInt(document.getElementById('numberSelect').value);
+            startGame();
+        }
+
+        function startGame() {
+            testTubes = [];
+            moveHistory = []; // リセット時に履歴も初期化
+
+            let selectBallColors = ballColors.slice(0, number26);
+            let exSelectColors = selectBallColors.flatMap(color => Array(4).fill(color));
+            shuffleArray(exSelectColors);
+
+            let separateExSelectColors = [];
+            for (let i = 0; i < exSelectColors.length; i += 4) {
+                separateExSelectColors.push(exSelectColors.slice(i, i + 4));
+            }
+
+            for (let i = 0; i < number26; i++) {
+                let testTube = { balls: separateExSelectColors[i], element: createTestTubeElement() };
+                testTubes.push(testTube);
+            }
+
+            addEmptyTestTube(); // 最初の空の試験管を追加
+            
+            numAddTestTubes();
+                
+            moveHistory = [];
+            saveState(); // 初期状態を保存
+                
+            renderTestTubes();
+        }
+        function numAddTestTubes() {
+            numAddTestTube = testTubes.length - number26 - 1;
+            document.getElementById("text").innerText = `＋🧪 ${2 - numAddTestTube}/2本`;
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function createTestTubeElement() {
+            let testTubeElement = document.createElement('div');
+            testTubeElement.className = 'test-tube';
+            testTubeElement.addEventListener('click', () => selectTube(testTubeElement));
+            return testTubeElement;
+        }
+
+        function addEmptyTestTube() {
+            if (numAddTestTube !== 2){
+                saveState(); // 追加前の状態を保存
+                let emptyTube = { balls: [], element: createTestTubeElement() };
+                testTubes.push(emptyTube);
+                numAddTestTubes();
+                renderTestTubes();
+            } 
+        }
+
+        function selectTube(testTubeElement) {
+            let testTube = testTubes.find(tube => tube.element === testTubeElement);
+            if (!testTube) return;
+            if (selectedTube === null) {
+                // 試験管を選択（ボールを持ち上げる）
+                if (testTube.balls.length > 0) {
+                    selectedTube = testTube;
+                    testTube.element.classList.add('selected');
+                    // ボールを少し持ち上げる
+                    let balls = testTube.element.querySelectorAll('.ball');
+                    if (balls.length > 0) {
+                        balls[balls.length - 1].style.bottom = `${parseInt(balls[balls.length - 1].style.bottom) + 30}px`;
+                    }
+                }
+            } else {
+                if (selectedTube !== testTube && canMoveBall(selectedTube, testTube)) {
+                    saveState(); // 移動前の状態を保存
+                    let ballColor = selectedTube.balls.pop();
+                    testTube.balls.push(ballColor);
+                    // 選択を解除（ボールを下げる）
+                    resetSelection();
+                    renderTestTubes();
+                    checkWinCondition();
+                } else {
+                    // 選択解除（ボールを下げる）
+                    resetSelection();
+                }
+            }
+        }
+        function resetSelection() {
+            if (selectedTube) {
+                selectedTube.element.classList.remove('selected');
+                // ボールを元の位置に戻す
+                let balls = selectedTube.element.querySelectorAll('.ball');
+                if (balls.length > 0) {
+                    balls[balls.length - 1].style.bottom = `${parseInt(balls[balls.length - 1].style.bottom) - 30}px`;
+                }
+            }
+            selectedTube = null;
+        }
+
+
+        function saveState() {
+            let stateCopy = testTubes.map(tube => ({ balls: [...tube.balls] }));
+            moveHistory.push(JSON.stringify(stateCopy)); // 文字列化して保存
+        }
+
+        function undoMove() {
+            if (moveHistory.length === 0) return;
+            let previousState = JSON.parse(moveHistory.pop()); // 文字列をオブジェクトに戻す
+            testTubes = previousState.map(tube => ({ balls: tube.balls, element: createTestTubeElement() }));
+            numAddTestTubes();
+            renderTestTubes();
+        }
+
+        function canMoveBall(fromTube, toTube) {
+            if (toTube.balls.length === 0) return true;
+            let firstBallColor = toTube.balls[toTube.balls.length - 1];
+            return firstBallColor === fromTube.balls[fromTube.balls.length - 1] && toTube.balls.length < numBalls;
+        }
+
+        function renderTestTubes() {
+            document.getElementById('testTubes').innerHTML = '';
+            testTubes.forEach(tube => {
+                tube.element.innerHTML = '';
+
+                tube.balls.forEach((color, i) => {
+                    let ballDiv = document.createElement('div');
+                    ballDiv.className = 'ball';
+                    ballDiv.style.bottom = `${i * 36 + 10}px`;
+                    let ballImg = document.createElement('img');
+                    ballImg.src = ballImages[color];
+                    ballDiv.appendChild(ballImg);
+                    tube.element.appendChild(ballDiv);
+                });
+
+                document.getElementById('testTubes').appendChild(tube.element);
+            });
+        }
+
+        function checkWinCondition() {
+            let isWin = testTubes.every(tube => 
+                tube.balls.length === 0 || tube.balls.length === 4 && tube.balls.every(color => color === tube.balls[0])
+            );
+            if (isWin) {setTimeout(() => alert('︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟'), 100);}
+        }
+        function retryGame() {
+            if (moveHistory.length === 0) return;
+            let previousState = JSON.parse(moveHistory[0]); // 文字列をオブジェクトに戻す
+            testTubes = previousState.map(tube => ({ balls: tube.balls, element: createTestTubeElement() }));
+            numAddTestTubes();
+            renderTestTubes();
+        }
+
+        function restartGame() { startGame(); }
+    
+        startGame();
+    
+        document.getElementById("text").innerText = `＋🧪 2/2本`;
+    </script>
+</body>
+</html>
