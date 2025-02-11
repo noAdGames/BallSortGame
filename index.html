@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BallSortGame</title>
+    <title>Ball Sort Game</title>
     <style>
         body { background-color: black; color: white; font-family: Arial, sans-serif; text-align: center; }
         .test-tube-container { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 20px; gap: 10px; }
@@ -68,7 +68,6 @@
             }
 
             addEmptyTestTube(); // 最初の空の試験管を追加
-            
             numAddTestTubes();
                 
             moveHistory = [];
@@ -76,6 +75,7 @@
                 
             renderTestTubes();
         }
+
         function numAddTestTubes() {
             numAddTestTube = testTubes.length - number26 - 1;
             document.getElementById("text").innerText = `＋🧪 ${2 - numAddTestTube}/2本`;
@@ -113,17 +113,31 @@
                 if (testTube.balls.length > 0) {
                     selectedTube = testTube;
                     testTube.element.classList.add('selected');
-                    // ボールを少し持ち上げる
-                    let balls = testTube.element.querySelectorAll('.ball');
-                    if (balls.length > 0) {
-                        balls[balls.length - 1].style.bottom = `${parseInt(balls[balls.length - 1].style.bottom) + 30}px`;
+                    // 同じ色のボールをまとめて持ち上げる
+                    let ballsToLift = [];
+                    let ballColor = testTube.balls[testTube.balls.length - 1];
+                    while (testTube.balls.length > 0 && testTube.balls[testTube.balls.length - 1] === ballColor) {
+                        ballsToLift.push(testTube.balls.pop());
                     }
+                    testTube.balls.push(...ballsToLift); // 取り出したボールを再度積み重ね
+                    // 持ち上げたボールを少し上に持ち上げる
+                    ballsToLift.forEach((ball, i) => {
+                        let ballDiv = testTube.element.querySelectorAll('.ball')[testTube.element.querySelectorAll('.ball').length - 1 - i];
+                        ballDiv.style.bottom = `${parseInt(ballDiv.style.bottom) + 30}px`;
+                    });
                 }
             } else {
-                if (selectedTube !== testTube && canMoveBall(selectedTube, testTube)) {
+                if (selectedTube !== testTube && canMoveBalls(selectedTube, testTube)) {
                     saveState(); // 移動前の状態を保存
-                    let ballColor = selectedTube.balls.pop();
-                    testTube.balls.push(ballColor);
+                    
+                    let ballColor = selectedTube.balls[selectedTube.balls.length - 1];
+                    let ballsToMove = [];
+                    while (selectedTube.balls.length > 0 && selectedTube.balls[selectedTube.balls.length - 1] === ballColor) {
+                        ballsToMove.push(selectedTube.balls.pop());
+                    }
+
+                    testTube.balls.push(...ballsToMove); // 一緒に移動するボールを追加
+
                     // 選択を解除（ボールを下げる）
                     resetSelection();
                     renderTestTubes();
@@ -134,6 +148,7 @@
                 }
             }
         }
+
         function resetSelection() {
             if (selectedTube) {
                 selectedTube.element.classList.remove('selected');
@@ -145,7 +160,6 @@
             }
             selectedTube = null;
         }
-
 
         function saveState() {
             let stateCopy = testTubes.map(tube => ({ balls: [...tube.balls] }));
@@ -160,7 +174,7 @@
             renderTestTubes();
         }
 
-        function canMoveBall(fromTube, toTube) {
+        function canMoveBalls(fromTube, toTube) {
             if (toTube.balls.length === 0) return true;
             let firstBallColor = toTube.balls[toTube.balls.length - 1];
             return firstBallColor === fromTube.balls[fromTube.balls.length - 1] && toTube.balls.length < numBalls;
@@ -191,6 +205,7 @@
             );
             if (isWin) {setTimeout(() => alert('︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟︎🌟'), 100);}
         }
+
         function retryGame() {
             if (moveHistory.length === 0) return;
             let previousState = JSON.parse(moveHistory[0]); // 文字列をオブジェクトに戻す
